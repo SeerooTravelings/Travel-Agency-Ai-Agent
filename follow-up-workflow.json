@@ -1,0 +1,196 @@
+{
+  "name": "SeerooTravels Lead Follow-up Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "everyDay",
+              "hour": 9
+            }
+          ]
+        }
+      },
+      "id": "node-cron-daily",
+      "name": "Daily at 9AM Trigger",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        -400,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEETS_ID_HERE"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Leads"
+        },
+        "filters": {
+          "conditions": [
+            {
+              "key": "Status",
+              "operation": "in",
+              "value": "New,Qualifying"
+            }
+          ]
+        }
+      },
+      "id": "node-fetch-open-leads",
+      "name": "Fetch Open Leads",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 3,
+      "position": [
+        -200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const leads = items.map(item => item.json);\nconst now = new Date();\nconst results = [];\n\nleads.forEach(lead => {\n  const createdDate = new Date(lead.CreatedTime);\n  const lastFollowUpDate = lead.LastFollowUpTime ? new Date(lead.LastFollowUpTime) : createdDate;\n  const diffDays = Math.floor((now - lastFollowUpDate) / (1000 * 60 * 60 * 24));\n  const totalAgeDays = Math.floor((now - createdDate) / (1000 * 60 * 60 * 24));\n  \n  let followUpCount = parseInt(lead.FollowUpCount || 0);\n  let message = \"\";\n  let trigger = false;\n  \n  if (followUpCount === 0 && totalAgeDays >= 1) {\n    message = `Assalamualaikum *${lead.SenderName}*,\n\nAap ki ${lead.ServiceType || 'travel query'} ke hawale se follow-up kar raha hoon. Kya aap ko package details ke baare me mazeed koi sawal puchna hai? \n\nOur team is here to assist you!`;\n    followUpCount = 1;\n    trigger = true;\n  } else if (followUpCount === 1 && totalAgeDays >= 3) {\n    message = `Hi *${lead.SenderName}*,\n\nSeeroo Travels ki taraf se special package updates available hain! Seats update ho rahi hain aur limited slots baki hain. \n\nKya hum call par connect karen?`;\n    followUpCount = 2;\n    trigger = true;\n  } else if (followUpCount === 2 && totalAgeDays >= 7) {\n    message = `Hello *${lead.SenderName}*,\n\nSeptember packages ki seats finish hone wali hain. Early-bird discount aaj expire ho raha hai. \n\nIf you want to secure your booking, please respond to this message.`;\n    followUpCount = 3;\n    trigger = true;\n  }\n  \n  if (trigger) {\n    results.push({\n      json: {\n        row_id: lead.row_id,\n        phone: lead.SenderPhone,\n        senderName: lead.SenderName,\n        text: message,\n        newFollowUpCount: followUpCount\n      }\n    });\n  }\n});\n\nreturn results;"
+      },
+      "id": "node-filter-followups",
+      "name": "Evaluate Follow-up Rules",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        0,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api50.unipile.com:18030/api/v1/chats",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-KEY",
+              "value": "6i+2zg84.W2iHyl4Pe3T/fREjswsxToHsmCwNJICvweJmod1HJUs="
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "account_id",
+              "value": "ZSQDa63MRHaGw4f33KrMSg"
+            },
+            {
+              "name": "attendees_ids",
+              "value": "={{ [$json.phone] }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ $json.text }}"
+            }
+          ]
+        }
+      },
+      "id": "node-send-followup-whatsapp",
+      "name": "Send Follow-up WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        200,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEETS_ID_HERE"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Leads"
+        },
+        "rowId": "={{ $json.row_id }}",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "FollowUpCount": "={{ $json.newFollowUpCount }}",
+            "LastFollowUpTime": "={{ new Date().toISOString() }}"
+          }
+        }
+      },
+      "id": "node-update-lead-status",
+      "name": "Update CRM Follow-up Log",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 3,
+      "position": [
+        400,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Daily at 9AM Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Open Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Open Leads": {
+      "main": [
+        [
+          {
+            "node": "Evaluate Follow-up Rules",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluate Follow-up Rules": {
+      "main": [
+        [
+          {
+            "node": "Send Follow-up WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Follow-up WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Update CRM Follow-up Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false
+}

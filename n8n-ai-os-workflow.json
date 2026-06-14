@@ -1,0 +1,1115 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp/webhook",
+        "options": {}
+      },
+      "id": "2ecec4c8-e6ea-4934-a5f9-d08b6b751c12",
+      "name": "WhatsApp Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        1824,
+        3824
+      ],
+      "webhookId": "whatsapp-webhook-uuid"
+    },
+    {
+      "parameters": {
+        "keepOnlySet": true,
+        "values": {
+          "string": [
+            {
+              "name": "phone",
+              "value": "={{ $json.body?.sender?.attendee_provider_id || $json.body?.sender?.attendee_id }}"
+            },
+            {
+              "name": "message",
+              "value": "={{ $json.body?.message }}"
+            },
+            {
+              "name": "senderName",
+              "value": "={{ $json.body?.sender?.attendee_name || 'Customer' }}"
+            },
+            {
+              "name": "chatId",
+              "value": "={{ $json.body?.chat_id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7c6f12c9-2f33-4dc9-b493-2bbf558e5c43",
+      "name": "Parse Incoming Details",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        2048,
+        3824
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer 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"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"model\": \"llama-3.3-70b-versatile\", \"response_format\": {\"type\": \"json_object\"}, \"messages\": [{\"role\": \"system\", \"content\": \"You are the Master Router Agent for Seeroo Travels. Classify the user's travel intent. Respond ONLY in JSON. Intents: 'umrah', 'hajj', 'visa', 'tours', 'flights', 'hotels', 'status_check', 'complaint', 'payment', 'general_faq'. Schema: {\\\"intent\\\": \\\"string\\\",\\\"confidence\\\": float}\"}, {\"role\": \"user\", \"content\": {{ JSON.stringify($('Parse Incoming Details').item.json.message) }} }]}",
+        "options": {}
+      },
+      "id": "482c2c05-a670-48bb-be69-e69f360251d2",
+      "name": "LLM Intent Classifier",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        3216,
+        4096
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const responseText = $('LLM Intent Classifier').item.json.choices[0].message.content;\nconst classification = JSON.parse(responseText);\nreturn [{\n  json: {\n    phone: $('Parse Incoming Details').item.json.phone,\n    message: $('Parse Incoming Details').item.json.message,\n    senderName: $('Parse Incoming Details').item.json.senderName,\n    intent: classification.intent,\n    confidence: classification.confidence\n  }\n}];"
+      },
+      "id": "6bf046fb-675d-4a85-822e-39d1c27965fa",
+      "name": "Parse Intent Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        3392,
+        3872
+      ]
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.intent }}",
+        "rules": {
+          "rules": [
+            {
+              "value2": "umrah"
+            },
+            {
+              "value2": "hajj"
+            },
+            {
+              "value2": "visa"
+            },
+            {
+              "value2": "tours"
+            },
+            {
+              "value2": "flights"
+            },
+            {
+              "value2": "hotels"
+            },
+            {
+              "value2": "status_check"
+            },
+            {
+              "value2": "complaint"
+            },
+            {
+              "value2": "payment"
+            },
+            {
+              "value2": "general_faq"
+            }
+          ]
+        },
+        "fallbackOutput": 9
+      },
+      "id": "752a74c4-234b-47d4-89ab-ece2fbf33766",
+      "name": "Route by Intent",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [
+        3616,
+        3840
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer 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"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"model\": \"llama-3.3-70b-versatile\", \"response_format\": {\"type\": \"json_object\"}, \"messages\": [{\"role\": \"system\", \"content\": \"You are the Umrah Agent. Qualify: month, persons, city, budget. Ask for missing details in Roman Urdu/English. Respond ONLY in JSON. Schema: {\\\"complete\\\": bool, \\\"data\\\": {\\\"month\\\": \\\"string/null\\\", \\\"persons\\\": number/null, \\\"city\\\": \\\"string/null\\\", \\\"budget\\\": \\\"string/null\\\"}, \\\"next_question\\\": \\\"string/null\\\"}\"}, {\"role\": \"user\", \"content\": {{ JSON.stringify($('Parse Incoming Details').item.json.message) }} }]}",
+        "options": {}
+      },
+      "id": "e64ca6d6-7375-49d6-92a1-38ffd324cbf8",
+      "name": "Umrah Qualification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        3840,
+        3296
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer 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"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"model\": \"llama-3.3-70b-versatile\", \"response_format\": {\"type\": \"json_object\"}, \"messages\": [{\"role\": \"system\", \"content\": \"You are the Hajj Agent. Qualify: scheme (Govt/Private), persons, budget, city. Respond ONLY in JSON. Schema: {\\\"complete\\\": bool, \\\"data\\\": {\\\"scheme\\\": \\\"string/null\\\", \\\"persons\\\": number/null, \\\"budget\\\": \\\"string/null\\\", \\\"city\\\": \\\"string/null\\\"}, \\\"next_question\\\": \\\"string/null\\\"}\"}, {\"role\": \"user\", \"content\": {{ JSON.stringify($('Parse Incoming Details').item.json.message) }} }]}",
+        "options": {}
+      },
+      "id": "dbc45224-30e3-4816-892b-983e3e0b890a",
+      "name": "Hajj Qualification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        3840,
+        3488
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer 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"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"model\": \"llama-3.3-70b-versatile\", \"response_format\": {\"type\": \"json_object\"}, \"messages\": [{\"role\": \"system\", \"content\": \"You are the Visa Agent. Qualify: purpose, passport_country, travel_date. Respond ONLY in JSON. Schema: {\\\"complete\\\": bool, \\\"data\\\": {\\\"purpose\\\": \\\"string/null\\\", \\\"passport_country\\\": \\\"string/null\\\", \\\"travel_date\\\": \\\"string/null\\\"}, \\\"next_question\\\": \\\"string/null\\\"}\"}, {\"role\": \"user\", \"content\": {{ JSON.stringify($('Parse Incoming Details').item.json.message) }} }]}",
+        "options": {}
+      },
+      "id": "50537c8e-6997-4812-acb4-c74595b97ab0",
+      "name": "Visa Qualification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        3840,
+        4032
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer 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"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"model\": \"llama-3.3-70b-versatile\", \"response_format\": {\"type\": \"json_object\"}, \"messages\": [{\"role\": \"system\", \"content\": \"You are the International Tours Agent. Qualify: destination, traveler_type, budget, travel_dates, duration_days. Respond ONLY in JSON. Schema: {\\\"complete\\\": bool, \\\"data\\\": {\\\"destination\\\": \\\"string/null\\\", \\\"traveler_type\\\": \\\"string/null\\\", \\\"budget\\\": \\\"string/null\\\", \\\"travel_dates\\\": \\\"string/null\\\", \\\"duration_days\\\": number/null}, \\\"next_question\\\": \\\"string/null\\\"}\"}, {\"role\": \"user\", \"content\": {{ JSON.stringify($('Parse Incoming Details').item.json.message) }} }]}",
+        "options": {}
+      },
+      "id": "8938f112-a9c8-416c-a006-b3a907d3a7f6",
+      "name": "Tours Qualification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        3840,
+        3728
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer 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"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"model\": \"llama-3.3-70b-versatile\", \"response_format\": {\"type\": \"json_object\"}, \"messages\": [{\"role\": \"system\", \"content\": \"You are the Flight Agent. Qualify: departure, destination, dates, passengers. Respond ONLY in JSON. Schema: {\\\"complete\\\": bool, \\\"data\\\": {\\\"departure\\\": \\\"string/null\\\", \\\"destination\\\": \\\"string/null\\\", \\\"dates\\\": \\\"string/null\\\", \\\"passengers\\\": number/null}, \\\"next_question\\\": \\\"string/null\\\"}\"}, {\"role\": \"user\", \"content\": {{ JSON.stringify($('Parse Incoming Details').item.json.message) }} }]}",
+        "options": {}
+      },
+      "id": "a3d8e223-82ae-49e3-ac16-09cd271dd076",
+      "name": "Flights Booking",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        4512,
+        4176
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer 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"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"model\": \"llama-3.3-70b-versatile\", \"response_format\": {\"type\": \"json_object\"}, \"messages\": [{\"role\": \"system\", \"content\": \"You are the Hotel Agent. Qualify: check_in, check_out, guests, haram_distance, budget. Respond ONLY in JSON. Schema: {\\\"complete\\\": bool, \\\"data\\\": {\\\"check_in\\\": \\\"string/null\\\", \\\"check_out\\\": \\\"string/null\\\", \\\"guests\\\": number/null, \\\"haram_distance\\\": \\\"string/null\\\", \\\"budget\\\": \\\"string/null\\\"}, \\\"next_question\\\": \\\"string/null\\\"}\"}, {\"role\": \"user\", \"content\": {{ JSON.stringify($('Parse Incoming Details').item.json.message) }} }]}",
+        "options": {}
+      },
+      "id": "c536f219-5ee6-4e4e-bdeb-13043f96b009",
+      "name": "Hotels Booking",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        4512,
+        4368
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1pfj3q2kutmk8AgqacsKzu3BA-RPwyq_XEGs82dpa4AY"
+        }
+      },
+      "id": "9cf83045-fc73-4992-84f0-2cd9ad24f34e",
+      "name": "Lookup Status in CRM",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 3,
+      "position": [
+        4512,
+        4752
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "pHgrDDWKgv0xidHW",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1pfj3q2kutmk8AgqacsKzu3BA-RPwyq_XEGs82dpa4AY"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "SupportTickets"
+        },
+        "options": {}
+      },
+      "id": "ac9a87bf-6c55-4d67-a885-2357974d9c7e",
+      "name": "Create Support Ticket",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 3,
+      "position": [
+        4288,
+        4560
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "pHgrDDWKgv0xidHW",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "keepOnlySet": true,
+        "values": {
+          "string": [
+            {
+              "name": "phone",
+              "value": "={{ $('Parse Intent Response').item.json.phone }}"
+            },
+            {
+              "name": "text",
+              "value": "💳 *Payment Instructions:* \nBank Transfer:\nAl-Baraka Bank Pakistan\nAccount Title: Seeroo Travels\nIBAN: PK21ABPA000288392182\n\nEasyPaisa/JazzCash:\nPhone: 0300-1234567\n\nAfter making the payment, please reply by sending the *screenshot/receipt proof* here."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "30387043-0b81-4854-8deb-c45b66b0a28f",
+      "name": "Payment Details Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        4512,
+        4944
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer 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"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"model\": \"llama-3.3-70b-versatile\", \"response_format\": {\"type\": \"json_object\"}, \"messages\": [{\"role\": \"system\", \"content\": \"You are Seeroo Travels RAG FAQ Assistant. Answer the question about Umrah visa duration, passport validity, insurance, or general topics using facts. Schema: {\\\"answered\\\": true, \\\"answer_text\\\": \\\"string\\\"}\"}, {\"role\": \"user\", \"content\": {{ JSON.stringify($('Parse Incoming Details').item.json.message) }} }]}",
+        "options": {}
+      },
+      "id": "5bdc6411-0126-4bf8-979a-22b91d9ab022",
+      "name": "RAG FAQ Bot",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        4512,
+        5136
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1pfj3q2kutmk8AgqacsKzu3BA-RPwyq_XEGs82dpa4AY",
+          "mode": "list",
+          "cachedResultName": "Untitled spreadsheet",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1pfj3q2kutmk8AgqacsKzu3BA-RPwyq_XEGs82dpa4AY/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1334942982,
+          "mode": "list",
+          "cachedResultName": "Leads",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1pfj3q2kutmk8AgqacsKzu3BA-RPwyq_XEGs82dpa4AY/edit#gid=1334942982"
+        },
+        "columnToMatchOn": "SenderPhone",
+        "valueToMatchOn": "={{ $('Parse Incoming Details').item.json.phone }}\n",
+        "fieldsUi": {
+          "values": [
+            {
+              "column": "SenderName",
+              "fieldValue": "={{ $('Parse Incoming Details').item.json.senderName }}\n"
+            },
+            {
+              "column": "Status",
+              "fieldValue": "={{ $json.complete ? 'Qualified' : 'Qualifying' }}\n"
+            },
+            {
+              "column": "ServiceType",
+              "fieldValue": "={{ $('Parse Intent Response').item.json.intent }}\n"
+            },
+            {
+              "column": "Month",
+              "fieldValue": "={{ $json.data?.month || null }}\n"
+            },
+            {
+              "column": "Persons",
+              "fieldValue": "={{ $json.data?.persons || null }}\n"
+            },
+            {
+              "column": "DepartureCity",
+              "fieldValue": "={{ $json.data?.city || null }}\n"
+            },
+            {
+              "column": "Budget",
+              "fieldValue": "={{ $json.data?.budget || null }}\n"
+            },
+            {
+              "column": "VisaPurpose",
+              "fieldValue": "={{ $json.data?.purpose || null }}\n"
+            },
+            {
+              "column": "TravelDates",
+              "fieldValue": "={{ $json.data?.travel_dates || null }}\n"
+            },
+            {
+              "column": "Duration",
+              "fieldValue": "={{ $json.data?.duration_days || $json.data?.duration || null }}\n"
+            },
+            {
+              "column": "SchemeType",
+              "fieldValue": "={{ $json.data?.scheme || null }}\n"
+            },
+            {
+              "column": "ActiveAgent",
+              "fieldValue": "={{ $('Parse Intent Response').item.json.intent }}\n"
+            },
+            {
+              "column": "BotActive",
+              "fieldValue": "=TRUE"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "adbaf46f-45cd-4dca-baf6-ea52e8438e1d",
+      "name": "Save Lead to Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 3,
+      "position": [
+        4064,
+        3632
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "pHgrDDWKgv0xidHW",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api50.unipile.com:18030/api/v1/chats/{{ $json.chatId || $('Parse Incoming Details').item.json.chatId }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-KEY",
+              "value": "6i+2zg84.W2iHyl4Pe3T/fREjswsxToHsmCwNJICvweJmod1HJUs="
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "={{ $json.text || $json.next_question || JSON.parse($json.choices[0].message.content).next_question || JSON.parse($json.choices[0].message.content).answer_text }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "bd75e677-f3ad-49d3-96c3-34065e8e15f2",
+      "name": "Send WhatsApp Response",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        4736,
+        4512
+      ]
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1pfj3q2kutmk8AgqacsKzu3BA-RPwyq_XEGs82dpa4AY",
+          "mode": "list",
+          "cachedResultName": "Untitled spreadsheet",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1pfj3q2kutmk8AgqacsKzu3BA-RPwyq_XEGs82dpa4AY/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1334942982,
+          "mode": "list",
+          "cachedResultName": "Leads",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1pfj3q2kutmk8AgqacsKzu3BA-RPwyq_XEGs82dpa4AY/edit#gid=1334942982"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "SenderPhone",
+              "lookupValue": "={{ $json.phone }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c8803141-41d7-44e0-8717-7d548c55c302",
+      "name": "Lookup Customer Session",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 3,
+      "position": [
+        2272,
+        3824
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "pHgrDDWKgv0xidHW",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.BotActive }}",
+              "value2": "FALSE"
+            }
+          ]
+        }
+      },
+      "id": "12580962-e202-47a2-bef2-c77376f024dc",
+      "name": "Is Bot Paused?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        2496,
+        3824
+      ]
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.ActiveAgent || 'None' }}",
+        "rules": {
+          "rules": [
+            {
+              "value2": "Umrah"
+            },
+            {
+              "value2": "Hajj",
+              "output": 1
+            },
+            {
+              "value2": "Visa",
+              "output": 2
+            }
+          ]
+        },
+        "fallbackOutput": 3
+      },
+      "id": "075758c9-ebcb-406b-9fff-f1a6a6fb7997",
+      "name": "Route by Session State",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [
+        2720,
+        3792
+      ]
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{ $json.ActiveAgent || 'None' }}",
+        "rules": {
+          "rules": [
+            {
+              "value2": "Tours"
+            },
+            {
+              "value2": "Flights",
+              "output": 1
+            },
+            {
+              "value2": "Hotels",
+              "output": 2
+            }
+          ]
+        },
+        "fallbackOutput": 3
+      },
+      "id": "4dcd1755-bcb5-4354-8980-efb2d122fdd6",
+      "name": "Route by Session State1",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [
+        2944,
+        3984
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "1pfj3q2kutmk8AgqacsKzu3BA-RPwyq_XEGs82dpa4AY"
+        }
+      },
+      "id": "a93e7c36-8665-4161-b54d-33609aa677f5",
+      "name": "Pause Bot on Complaint",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 3,
+      "position": [
+        4512,
+        4560
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "pHgrDDWKgv0xidHW",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.Status }}",
+              "value2": "Qualified"
+            }
+          ]
+        }
+      },
+      "id": "9293f9dd-382e-4752-9050-2ae372455803",
+      "name": "Is Lead Qualified?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        4288,
+        3632
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api50.unipile.com:18030/api/v1/chats",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-KEY",
+              "value": "6i+2zg84.W2iHyl4Pe3T/fREjswsxToHsmCwNJICvweJmod1HJUs="
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "account_id",
+              "value": "ZSQDa63MRHaGw4f33KrMSg"
+            },
+            {
+              "name": "attendees_ids",
+              "value": "={{ [$env.SALES_GROUP_CHAT_ID || 'SALES_GROUP_PHONE'] }}"
+            },
+            {
+              "name": "text",
+              "value": "=🚨 *New Qualified Lead Alert* 🚨\n\n👤 Name: {{ $json.SenderName }}\n📱 Phone: {{ $json.SenderPhone }}\n✈️ Service: {{ $json.ServiceType }}\n🌆 Departure City: {{ $json.DepartureCity }}\n💵 Budget: {{ $json.Budget }}\n👥 Passengers: {{ $json.Persons }}\n\nPlease contact the client immediately."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f83a6edd-5cbd-45e8-b809-25c65eaec148",
+      "name": "Sales Group WhatsApp Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        4512,
+        3568
+      ]
+    }
+  ],
+  "connections": {
+    "WhatsApp Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse Incoming Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Incoming Details": {
+      "main": [
+        [
+          {
+            "node": "Lookup Customer Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM Intent Classifier": {
+      "main": [
+        [
+          {
+            "node": "Parse Intent Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Intent Response": {
+      "main": [
+        [
+          {
+            "node": "Route by Intent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Intent": {
+      "main": [
+        [
+          {
+            "node": "Umrah Qualification",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Hajj Qualification",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Visa Qualification",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Tours Qualification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Umrah Qualification": {
+      "main": [
+        [
+          {
+            "node": "Save Lead to Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hajj Qualification": {
+      "main": [
+        [
+          {
+            "node": "Save Lead to Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Visa Qualification": {
+      "main": [
+        [
+          {
+            "node": "Save Lead to Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tours Qualification": {
+      "main": [
+        [
+          {
+            "node": "Save Lead to Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Flights Booking": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hotels Booking": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Status in CRM": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Support Ticket": {
+      "main": [
+        [
+          {
+            "node": "Pause Bot on Complaint",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Payment Details Response": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RAG FAQ Bot": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Lead to Sheets": {
+      "main": [
+        [
+          {
+            "node": "Is Lead Qualified?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup Customer Session": {
+      "main": [
+        [
+          {
+            "node": "Is Bot Paused?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Bot Paused?": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Route by Session State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Session State": {
+      "main": [
+        [
+          {
+            "node": "Umrah Qualification",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Hajj Qualification",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Visa Qualification",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Route by Session State1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Session State1": {
+      "main": [
+        [
+          {
+            "node": "Tours Qualification",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Flights Booking",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Hotels Booking",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "LLM Intent Classifier",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pause Bot on Complaint": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Lead Qualified?": {
+      "main": [
+        [
+          {
+            "node": "Sales Group WhatsApp Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send WhatsApp Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sales Group WhatsApp Alert": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d0ab31978613681a4aa1ac949433cd82b78aba6d4dcd353fa504760087d3d840"
+  }
+}
