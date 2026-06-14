@@ -434,6 +434,7 @@
     },
     {
       "parameters": {
+        "agent": "tools",
         "promptType": "define",
         "text": "={{ $json.message || $json.input }}",
         "options": {
@@ -451,6 +452,7 @@
     },
     {
       "parameters": {
+        "agent": "tools",
         "promptType": "define",
         "text": "={{ $json.message || $json.input }}",
         "options": {
@@ -468,6 +470,7 @@
     },
     {
       "parameters": {
+        "agent": "tools",
         "promptType": "define",
         "text": "={{ $json.message || $json.input }}",
         "options": {
@@ -485,6 +488,7 @@
     },
     {
       "parameters": {
+        "agent": "tools",
         "promptType": "define",
         "text": "={{ $json.message || $json.input }}",
         "options": {
@@ -502,6 +506,7 @@
     },
     {
       "parameters": {
+        "agent": "tools",
         "promptType": "define",
         "text": "={{ $json.message || $json.input }}",
         "options": {
@@ -519,6 +524,7 @@
     },
     {
       "parameters": {
+        "agent": "tools",
         "promptType": "define",
         "text": "={{ $json.message || $json.input }}",
         "options": {
@@ -536,6 +542,7 @@
     },
     {
       "parameters": {
+        "agent": "tools",
         "promptType": "define",
         "text": "={{ $json.message || $json.input }}",
         "options": {
@@ -553,6 +560,7 @@
     },
     {
       "parameters": {
+        "agent": "tools",
         "promptType": "define",
         "text": "={{ $json.message || $json.input }}",
         "options": {
