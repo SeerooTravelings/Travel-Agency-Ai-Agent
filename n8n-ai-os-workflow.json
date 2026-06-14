@@ -430,71 +430,8 @@
     },
     {
       "parameters": {
-        "name": "manage_crm_lead",
-        "description": "Use this tool to get existing lead details or save/update lead details (Month, Persons, DepartureCity, Budget, ServiceType, Status, ActiveAgent, BotActive) in the Leads sheet.",
-        "jsCode": "const spreadsheetId = '1pfj3q2kutmk8AgqacsKzu3BA-RPwyq_XEGs82dpa4AY';\nconst phone = args.phone || $('Parse Incoming Details').item.json.phone;\nconst action = args.action; // 'get' or 'update'\n\nif (action === 'get') {\n  const res = await this.helpers.request({\n    method: 'GET',\n    url: `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Leads!A:R`,\n    useAuth: true\n  });\n  const rows = res.values || [];\n  const headers = rows[0] || [];\n  const phoneIndex = headers.indexOf('SenderPhone');\n  const matchedRow = rows.find(r => r[phoneIndex] === phone);\n  if (!matchedRow) {\n    return { found: false, message: \"No existing lead found for this phone number.\" };\n  }\n  const lead = {};\n  headers.forEach((h, i) => {\n    lead[h] = matchedRow[i] || null;\n  });\n  return { found: true, lead };\n} else if (action === 'update') {\n  const data = args.data || {};\n  const res = await this.helpers.request({\n    method: 'GET',\n    url: `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Leads!A:R`,\n    useAuth: true\n  });\n  const rows = res.values || [];\n  const headers = rows[0] || [];\n  const phoneIndex = headers.indexOf('SenderPhone');\n  const matchedRowIndex = rows.findIndex(r => r[phoneIndex] === phone);\n\n  if (matchedRowIndex === -1) {\n    const newRow = headers.map(h => {\n      if (h === 'SenderPhone') return phone;\n      if (h === 'CreatedTime') return new Date().toISOString();\n      return data[h] || '';\n    });\n    await this.helpers.request({\n      method: 'POST',\n      url: `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Leads!A1:append?valueInputOption=USER_ENTERED`,\n      body: { values: [newRow] },\n      useAuth: true\n    });\n    return { success: true, action: 'created', message: 'New lead row added successfully.' };\n  } else {\n    const rowNum = matchedRowIndex + 1;\n    const existingRow = rows[matchedRowIndex];\n    const updatedRow = headers.map((h, i) => {\n      if (h === 'SenderPhone') return phone;\n      if (data[h] !== undefined) return data[h];\n      return existingRow[i] || '';\n    });\n    await this.helpers.request({\n      method: 'PUT',\n      url: `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Leads!A${rowNum}:R${rowNum}?valueInputOption=USER_ENTERED`,\n      body: { values: [updatedRow] },\n      useAuth: true\n    });\n    return { success: true, action: 'updated', message: `Lead row ${rowNum} updated successfully.` };\n  }\n}"
-      },
-      "id": "crm-tool-id",
-      "name": "CRM Lead Manager Tool",
-      "type": "@n8n/n8n-nodes-langchain.toolCustom",
-      "typeVersion": 1,
-      "position": [
-        4400,
-        2800
-      ],
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "pHgrDDWKgv0xidHW",
-          "name": "Google Sheets OAuth2 API"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "name": "query_travel_packages",
-        "description": "Use this tool to search active packages (Umrah, Hajj, or International) in the Packages sheet of Google Sheets. You can filter by category (Umrah, Hajj, International).",
-        "jsCode": "const spreadsheetId = '1pfj3q2kutmk8AgqacsKzu3BA-RPwyq_XEGs82dpa4AY';\nconst category = args.category; // 'Umrah', 'Hajj', or 'International'\n\nconst res = await this.helpers.request({\n  method: 'GET',\n  url: `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Packages!A:H`,\n  useAuth: true\n});\nconst rows = res.values || [];\nconst headers = rows[0] || [];\nconst categoryIndex = headers.indexOf('Category');\nconst statusIndex = headers.indexOf('Status');\n\nconst packages = [];\nfor (let i = 1; i < rows.length; i++) {\n  const row = rows[i];\n  if (row[statusIndex] !== 'Active') continue;\n  if (category && row[categoryIndex] !== category) continue;\n  \n  const pkg = {};\n  headers.forEach((h, idx) => {\n    pkg[h] = row[idx] || null;\n  });\n  packages.push(pkg);\n}\nreturn { success: true, packages };"
-      },
-      "id": "packages-tool-id",
-      "name": "Travel Packages Search Tool",
-      "type": "@n8n/n8n-nodes-langchain.toolCustom",
-      "typeVersion": 1,
-      "position": [
-        4600,
-        2800
-      ],
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "pHgrDDWKgv0xidHW",
-          "name": "Google Sheets OAuth2 API"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "name": "handle_complaint",
-        "description": "Use this tool to log a support ticket in the SupportTickets sheet and pause the AI bot (BotActive = FALSE, ActiveAgent = Complaint) in the Leads sheet when a user has a complaint.",
-        "jsCode": "const spreadsheetId = '1pfj3q2kutmk8AgqacsKzu3BA-RPwyq_XEGs82dpa4AY';\nconst phone = args.phone || $('Parse Incoming Details').item.json.phone;\nconst description = args.description;\nconst category = args.category || 'Other';\n\nconst resLeads = await this.helpers.request({\n  method: 'GET',\n  url: `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Leads!A:R`,\n  useAuth: true\n});\nconst rowsLeads = resLeads.values || [];\nconst headersLeads = rowsLeads[0] || [];\nconst phoneIndex = headersLeads.indexOf('SenderPhone');\nconst matchedIndex = rowsLeads.findIndex(r => r[phoneIndex] === phone);\n\nif (matchedIndex !== -1) {\n  const rowNum = matchedIndex + 1;\n  const botActiveIndex = headersLeads.indexOf('BotActive');\n  const activeAgentIndex = headersLeads.indexOf('ActiveAgent');\n  \n  await this.helpers.request({\n    method: 'PUT',\n    url: `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Leads!Q${rowNum}:R${rowNum}?valueInputOption=USER_ENTERED`,\n    body: { values: [[\"Complaint\", \"FALSE\"]] },\n    useAuth: true\n  });\n}\n\nconst ticketId = 'TCK-' + Math.floor(1000 + Math.random() * 9000);\nconst ticketRow = [ticketId, phone, category, description, 'Open', 'Unassigned', new Date().toISOString()];\n\nawait this.helpers.request({\n  method: 'POST',\n  url: `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/SupportTickets!A1:G1:append?valueInputOption=USER_ENTERED`,\n  body: { values: [ticketRow] },\n  useAuth: true\n});\n\nreturn { success: true, ticketId, message: \"Bot paused, support ticket created successfully.\" };"
-      },
-      "id": "complaint-tool-id",
-      "name": "Complaint Manager Tool",
-      "type": "@n8n/n8n-nodes-langchain.toolCustom",
-      "typeVersion": 1,
-      "position": [
-        4800,
-        2800
-      ],
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "pHgrDDWKgv0xidHW",
-          "name": "Google Sheets OAuth2 API"
-        }
-      }
-    },
-    {
-      "parameters": {
         "options": {
-          "systemMessage": "You are Zain, a senior Umrah consultant at Seeroo Travels. Speak Roman Urdu and English. Your goal is to guide the user warmly and qualify their details. You must ask for and collect: 1) Month of travel, 2) Number of persons, 3) Departure city, 4) Budget. Speak conversationally and ask one details at a time with empathy. Use 'manage_crm_lead' tool with action 'update' to save details as you get them. Once complete, search packages using 'query_travel_packages' tool with category 'Umrah' and present them warmly."
+          "systemMessage": "You are Zain, a warm senior travel consultant at Seeroo Travels. Speak Roman Urdu and English. Guide the user and qualify: 1) Month of travel, 2) Number of persons, 3) Departure city, 4) Budget. Ask one detail at a time with empathy. Active Packages: 1) Premium Gold: 350,000 PKR, 15 Days (5-Star Hotels in Makkah/Madinah, private luxury transport), 2) Economy Silver: 260,000 PKR, 15 Days (3-Star Hotels, shared shuttle transport). Respond ONLY in JSON matching this schema: {\"response\": \"string\", \"complete\": boolean, \"activeAgent\": \"Umrah\", \"data\": {\"month\": \"string/null\", \"persons\": number/null, \"city\": \"string/null\", \"budget\": \"string/null\"}}."
         }
       },
       "id": "umrah-agent-id",
@@ -509,7 +446,7 @@
     {
       "parameters": {
         "options": {
-          "systemMessage": "You are Farhan, a dedicated Hajj Coordinator at Seeroo Travels. Speak Roman Urdu and English. Help the user qualify Hajj details. Ask for and collect: 1) Scheme Type (Government or Private), 2) Number of passengers, 3) Budget. Keep a respectful and spiritual tone. Use the 'manage_crm_lead' tool to save progress. Present packages using 'query_travel_packages' tool with category 'Hajj'."
+          "systemMessage": "You are Farhan, a dedicated Hajj Coordinator at Seeroo Travels. Speak Roman Urdu and English. Guide the user and qualify: 1) Scheme Type (Government or Private), 2) Number of passengers, 3) Budget. Keep a respectful and spiritual tone. Active Packages: 1) Government Hajj Scheme: ~1,200,000 PKR, 2) Private Hajj Scheme: ~1,800,000 PKR. Respond ONLY in JSON matching this schema: {\"response\": \"string\", \"complete\": boolean, \"activeAgent\": \"Hajj\", \"data\": {\"scheme\": \"string/null\", \"persons\": number/null, \"budget\": \"string/null\"}}."
         }
       },
       "id": "hajj-agent-id",
@@ -524,7 +461,7 @@
     {
       "parameters": {
         "options": {
-          "systemMessage": "You are Aisha, a Visa Consultant at Seeroo Travels. Speak Roman Urdu and English. Guide the user through visa qualifications. Ask for and collect: 1) Purpose of visa, 2) Passport country, 3) Planned travel date. Inform them about general documentation. Save details to CRM using 'manage_crm_lead' tool."
+          "systemMessage": "You are Aisha, a Visa Consultant at Seeroo Travels. Speak Roman Urdu and English. Guide the user and qualify: 1) Purpose of visa, 2) Passport country, 3) Planned travel date. Respond ONLY in JSON matching this schema: {\"response\": \"string\", \"complete\": boolean, \"activeAgent\": \"Visa\", \"data\": {\"purpose\": \"string/null\", \"passport_country\": \"string/null\", \"travel_date\": \"string/null\"}}."
         }
       },
       "id": "visa-agent-id",
@@ -539,7 +476,7 @@
     {
       "parameters": {
         "options": {
-          "systemMessage": "You are Bilal, an International Tours Planner at Seeroo Travels. Speak Roman Urdu and English. Assist the user with tour queries. Qualify: 1) Destination, 2) Traveler type (family/couple/solo), 3) Duration of stay, 4) Budget. Recommend tour plans. Save details to CRM and use 'query_travel_packages' tool with category 'International' to find tour packages."
+          "systemMessage": "You are Bilal, an International Tours Planner at Seeroo Travels. Speak Roman Urdu and English. Guide the user and qualify: 1) Destination, 2) Traveler type (family/couple/solo), 3) Duration of stay, 4) Budget. Active Packages: 1) Thailand Escape Tour: 180,000 PKR, 7 Days (Bangkok & Phuket hotels + sightseeing). Respond ONLY in JSON matching this schema: {\"response\": \"string\", \"complete\": boolean, \"activeAgent\": \"Tours\", \"data\": {\"destination\": \"string/null\", \"traveler_type\": \"string/null\", \"duration_days\": number/null, \"budget\": \"string/null\"}}."
         }
       },
       "id": "tours-agent-id",
@@ -554,7 +491,7 @@
     {
       "parameters": {
         "options": {
-          "systemMessage": "You are Saad, a Flight Booking Agent at Seeroo Travels. Speak Roman Urdu and English. Qualify: 1) Departure city, 2) Destination, 3) Travel dates, 4) Number of passengers. Search flight availability parameters and save details using 'manage_crm_lead' tool."
+          "systemMessage": "You are Saad, a Flight Booking Agent at Seeroo Travels. Speak Roman Urdu and English. Guide the user and qualify: 1) Departure city, 2) Destination, 3) Travel dates, 4) Number of passengers. Respond ONLY in JSON matching this schema: {\"response\": \"string\", \"complete\": boolean, \"activeAgent\": \"Flights\", \"data\": {\"departure\": \"string/null\", \"destination\": \"string/null\", \"dates\": \"string/null\", \"passengers\": number/null}}."
         }
       },
       "id": "flights-agent-id",
@@ -569,7 +506,7 @@
     {
       "parameters": {
         "options": {
-          "systemMessage": "You are Hamza, a Hotel Coordinator at Seeroo Travels. Speak Roman Urdu and English. Help qualify hotel requirements: 1) Check-in/Check-out dates, 2) Number of guests, 3) Distance from Haram (Makkah/Madinah), 4) Budget. Save details to CRM."
+          "systemMessage": "You are Hamza, a Hotel Coordinator at Seeroo Travels. Speak Roman Urdu and English. Guide the user and qualify: 1) Check-in/Check-out dates, 2) Number of guests, 3) Distance from Haram (Makkah/Madinah), 4) Budget. Respond ONLY in JSON matching this schema: {\"response\": \"string\", \"complete\": boolean, \"activeAgent\": \"Hotels\", \"data\": {\"check_in\": \"string/null\", \"check_out\": \"string/null\", \"guests\": number/null, \"haram_distance\": \"string/null\", \"budget\": \"string/null\"}}."
         }
       },
       "id": "hotels-agent-id",
@@ -584,7 +521,7 @@
     {
       "parameters": {
         "options": {
-          "systemMessage": "You are Hassan, the general customer service assistant at Seeroo Travels. Answer the user's general questions about rules, timings, documents, or travel advice. Keep your tone polite and informative. If they ask about package availability, guide them to specify a service."
+          "systemMessage": "You are Hassan, the general customer service assistant at Seeroo Travels. Speak Roman Urdu and English. Answer the user's general questions about rules, timings, documents, or travel advice. Respond ONLY in JSON matching this schema: {\"response\": \"string\", \"complete\": false, \"activeAgent\": \"FAQ\", \"data\": {}}."
         }
       },
       "id": "faq-agent-id",
@@ -599,7 +536,7 @@
     {
       "parameters": {
         "options": {
-          "systemMessage": "You are Zainab, a Support Executive at Seeroo Travels. Speak Roman Urdu/English. Listen to the user's issue with empathy, apologize for the inconvenience, and log the ticket using the 'handle_complaint' tool. Inform them that the bot is paused and a human agent will contact them immediately."
+          "systemMessage": "You are Zainab, a Support Executive at Seeroo Travels. Speak Roman Urdu and English. Listen to the user's issue with empathy, apologize for the inconvenience, and qualify: 1) Complaint Category (Hotel/Transport/Guide/Visa/Other), 2) Issue Description. Tell them a ticket is created. Respond ONLY in JSON matching this schema: {\"response\": \"string\", \"complete\": true, \"activeAgent\": \"Complaint\", \"data\": {\"category\": \"string/null\", \"description\": \"string/null\"}}."
         }
       },
       "id": "complaint-agent-id",
@@ -610,6 +547,137 @@
         4700,
         3700
       ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse the JSON string emitted by the AI Agent node\nconst rawText = $json.output || $json.text || '';\nlet parsed;\ntry {\n  parsed = JSON.parse(rawText);\n} catch (e) {\n  // Regex to extract JSON block in case LLM wrapped it in conversational text\n  const jsonMatch = rawText.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    try {\n      parsed = JSON.parse(jsonMatch[0]);\n    } catch (innerE) {\n      parsed = { response: rawText, complete: false, activeAgent: 'FAQ', data: {} };\n    }\n  } else {\n    parsed = { response: rawText, complete: false, activeAgent: 'FAQ', data: {} };\n  }\n}\n\n// Ensure default structure\nparsed.response = parsed.response || rawText;\nparsed.complete = !!parsed.complete;\nparsed.activeAgent = parsed.activeAgent || 'FAQ';\nparsed.data = parsed.data || {};\n\nreturn [{\n  json: {\n    phone: $('Parse Incoming Details').item.json.phone,\n    senderName: $('Parse Incoming Details').item.json.senderName,\n    text: parsed.response,\n    complete: parsed.complete,\n    activeAgent: parsed.activeAgent,\n    data: parsed.data\n  }\n}];"
+      },
+      "id": "parse-agent-response-id",
+      "name": "Parse Agent Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        5100,
+        3400
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1pfj3q2kutmk8AgqacsKzu3BA-RPwyq_XEGs82dpa4AY",
+          "mode": "list",
+          "cachedResultName": "Untitled spreadsheet",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1pfj3q2kutmk8AgqacsKzu3BA-RPwyq_XEGs82dpa4AY/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1334942982,
+          "mode": "list",
+          "cachedResultName": "Leads",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1pfj3q2kutmk8AgqacsKzu3BA-RPwyq_XEGs82dpa4AY/edit#gid=1334942982"
+        },
+        "keyRow": "SenderPhone",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "SenderPhone": "={{ $json.phone }}",
+            "SenderName": "={{ $json.senderName }}",
+            "Status": "={{ $json.complete ? 'Qualified' : 'Qualifying' }}",
+            "ServiceType": "={{ $json.activeAgent }}",
+            "Month": "={{ $json.data.month || undefined }}",
+            "Persons": "={{ $json.data.persons || undefined }}",
+            "DepartureCity": "={{ $json.data.city || undefined }}",
+            "Budget": "={{ $json.data.budget || undefined }}",
+            "VisaPurpose": "={{ $json.data.purpose || undefined }}",
+            "TravelDates": "={{ $json.data.dates || $json.data.travel_date || undefined }}",
+            "SchemeType": "={{ $json.data.scheme || undefined }}",
+            "ActiveAgent": "={{ $json.activeAgent }}",
+            "BotActive": "={{ $json.activeAgent === 'Complaint' ? 'FALSE' : 'TRUE' }}",
+            "CreatedTime": "={{ $('Lookup Customer Session').item.json.CreatedTime || new Date().toISOString() }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "save-lead-to-sheets-id",
+      "name": "Save Lead to Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 3,
+      "position": [
+        5350,
+        3400
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "pHgrDDWKgv0xidHW",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.activeAgent }}",
+              "value2": "Complaint"
+            }
+          ]
+        }
+      },
+      "id": "check-if-complaint-id",
+      "name": "Check If Complaint",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        5600,
+        3400
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1pfj3q2kutmk8AgqacsKzu3BA-RPwyq_XEGs82dpa4AY",
+          "mode": "list",
+          "cachedResultName": "Untitled spreadsheet",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1pfj3q2kutmk8AgqacsKzu3BA-RPwyq_XEGs82dpa4AY/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "SupportTickets",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "TicketID": "={{ 'TCK-' + Math.floor(1000 + Math.random() * 9000) }}",
+            "Phone": "={{ $json.phone }}",
+            "Category": "={{ $json.data.category || 'Other' }}",
+            "Description": "={{ $json.data.description || 'No description provided' }}",
+            "Status": "Open",
+            "AssignedAgent": "Zainab",
+            "CreatedTime": "={{ new Date().toISOString() }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "create-support-ticket-id",
+      "name": "Create Support Ticket",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 3,
+      "position": [
+        5850,
+        3200
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "pHgrDDWKgv0xidHW",
+          "name": "Google Sheets OAuth2 API"
+        }
+      }
     }
   ],
   "connections": {
@@ -629,71 +697,6 @@
         [
           {
             "node": "Lookup Customer Session",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "LLM Intent Classifier": {
-      "main": [
-        [
-          {
-            "node": "Parse Intent Response",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Parse Intent Response": {
-      "main": [
-        [
-          {
-            "node": "Route by Intent",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Route by Intent": {
-      "main": [
-        [
-          {
-            "node": "Umrah AI Agent",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Hajj AI Agent",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Visa AI Agent",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Tours AI Agent",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Payment Details Response": {
-      "main": [
-        [
-          {
-            "node": "Send WhatsApp Response",
             "type": "main",
             "index": 0
           }
@@ -787,25 +790,103 @@
         ]
       ]
     },
-    "Is Lead Qualified?": {
+    "LLM Intent Classifier": {
       "main": [
         [
           {
-            "node": "Sales Group WhatsApp Alert",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Send WhatsApp Response",
+            "node": "Parse Intent Response",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Sales Group WhatsApp Alert": {
+    "Parse Intent Response": {
+      "main": [
+        [
+          {
+            "node": "Route by Intent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Intent": {
+      "main": [
+        [
+          {
+            "node": "Umrah AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Hajj AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Visa AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Tours AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Flights AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Hotels AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "RAG FAQ Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Complaint & Support Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Payment Details Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "RAG FAQ Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Payment Details Response": {
       "main": [
         [
           {
@@ -908,149 +989,11 @@
         ]
       ]
     },
-    "CRM Lead Manager Tool": {
-      "ai_tool": [
-        [
-          {
-            "node": "Umrah AI Agent",
-            "type": "ai_tool",
-            "index": 0
-          },
-          {
-            "node": "Hajj AI Agent",
-            "type": "ai_tool",
-            "index": 0
-          },
-          {
-            "node": "Visa AI Agent",
-            "type": "ai_tool",
-            "index": 0
-          },
-          {
-            "node": "Tours AI Agent",
-            "type": "ai_tool",
-            "index": 0
-          },
-          {
-            "node": "Flights AI Agent",
-            "type": "ai_tool",
-            "index": 0
-          },
-          {
-            "node": "Hotels AI Agent",
-            "type": "ai_tool",
-            "index": 0
-          },
-          {
-            "node": "RAG FAQ Agent",
-            "type": "ai_tool",
-            "index": 0
-          },
-          {
-            "node": "Complaint & Support Agent",
-            "type": "ai_tool",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Travel Packages Search Tool": {
-      "ai_tool": [
-        [
-          {
-            "node": "Umrah AI Agent",
-            "type": "ai_tool",
-            "index": 0
-          },
-          {
-            "node": "Hajj AI Agent",
-            "type": "ai_tool",
-            "index": 0
-          },
-          {
-            "node": "Visa AI Agent",
-            "type": "ai_tool",
-            "index": 0
-          },
-          {
-            "node": "Tours AI Agent",
-            "type": "ai_tool",
-            "index": 0
-          },
-          {
-            "node": "Flights AI Agent",
-            "type": "ai_tool",
-            "index": 0
-          },
-          {
-            "node": "Hotels AI Agent",
-            "type": "ai_tool",
-            "index": 0
-          },
-          {
-            "node": "RAG FAQ Agent",
-            "type": "ai_tool",
-            "index": 0
-          },
-          {
-            "node": "Complaint & Support Agent",
-            "type": "ai_tool",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Complaint Manager Tool": {
-      "ai_tool": [
-        [
-          {
-            "node": "Umrah AI Agent",
-            "type": "ai_tool",
-            "index": 0
-          },
-          {
-            "node": "Hajj AI Agent",
-            "type": "ai_tool",
-            "index": 0
-          },
-          {
-            "node": "Visa AI Agent",
-            "type": "ai_tool",
-            "index": 0
-          },
-          {
-            "node": "Tours AI Agent",
-            "type": "ai_tool",
-            "index": 0
-          },
-          {
-            "node": "Flights AI Agent",
-            "type": "ai_tool",
-            "index": 0
-          },
-          {
-            "node": "Hotels AI Agent",
-            "type": "ai_tool",
-            "index": 0
-          },
-          {
-            "node": "RAG FAQ Agent",
-            "type": "ai_tool",
-            "index": 0
-          },
-          {
-            "node": "Complaint & Support Agent",
-            "type": "ai_tool",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Umrah AI Agent": {
       "main": [
         [
           {
-            "node": "Send WhatsApp Response",
+            "node": "Parse Agent Response",
             "type": "main",
             "index": 0
           }
@@ -1061,7 +1004,7 @@
       "main": [
         [
           {
-            "node": "Send WhatsApp Response",
+            "node": "Parse Agent Response",
             "type": "main",
             "index": 0
           }
@@ -1072,7 +1015,7 @@
       "main": [
         [
           {
-            "node": "Send WhatsApp Response",
+            "node": "Parse Agent Response",
             "type": "main",
             "index": 0
           }
@@ -1083,7 +1026,7 @@
       "main": [
         [
           {
-            "node": "Send WhatsApp Response",
+            "node": "Parse Agent Response",
             "type": "main",
             "index": 0
           }
@@ -1094,7 +1037,7 @@
       "main": [
         [
           {
-            "node": "Send WhatsApp Response",
+            "node": "Parse Agent Response",
             "type": "main",
             "index": 0
           }
@@ -1105,7 +1048,7 @@
       "main": [
         [
           {
-            "node": "Send WhatsApp Response",
+            "node": "Parse Agent Response",
             "type": "main",
             "index": 0
           }
@@ -1116,7 +1059,7 @@
       "main": [
         [
           {
-            "node": "Send WhatsApp Response",
+            "node": "Parse Agent Response",
             "type": "main",
             "index": 0
           }
@@ -1124,6 +1067,86 @@
       ]
     },
     "Complaint & Support Agent": {
+      "main": [
+        [
+          {
+            "node": "Parse Agent Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Agent Response": {
+      "main": [
+        [
+          {
+            "node": "Save Lead to Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Lead to Sheets": {
+      "main": [
+        [
+          {
+            "node": "Check If Complaint",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Complaint": {
+      "main": [
+        [
+          {
+            "node": "Create Support Ticket",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Is Lead Qualified?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Support Ticket": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Lead Qualified?": {
+      "main": [
+        [
+          {
+            "node": "Sales Group WhatsApp Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send WhatsApp Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sales Group WhatsApp Alert": {
       "main": [
         [
           {
